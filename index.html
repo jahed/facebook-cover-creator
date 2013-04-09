@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+	<title>Facebook Profile Image Creator</title>
+	
+	<style type="text/css">
+		
+		body {
+			margin:0;
+			padding:0;
+			background:#E7EBF2;
+			color:#fefefe;
+			font: 12px/12px "Calibri", sans-serif;
+		}
+		
+		#main {
+			width:851px;
+			margin:0 auto;
+			position:relative;
+		}
+		
+		#theCanvas {
+			margin-top:37px;
+			cursor:move;
+		}
+		
+		#template {
+			position:absolute;
+				top:0;
+				z-index:100;
+			pointer-events:none;
+		}
+		
+		#smallAvatarCanvas {
+			position:absolute;
+				top:9px;
+				left:703px;
+				z-index:90;
+		}
+		
+		#top {
+			position:absolute;
+				z-index:-10;
+				top:0;
+				left:0;
+			display:block;
+				width:100%;
+				height:37px;
+			border-bottom:1px solid #133783;
+			background:#3B5998;
+		}
+		
+		#controls {
+			background: linear-gradient(bottom,#111,#222);
+				background: -moz-linear-gradient(bottom,#111,#222);
+				background: -webkit-linear-gradient(bottom,#111,#222);
+			position:fixed;
+				bottom:0px;
+				left:0px;
+				z-index:200;
+			width:100%;
+			height:32px;
+			padding:8px 0;
+			border-top:1px solid #000;
+			line-height:32px;
+		}
+		
+		#currentImage {
+			vertical-align:middle;
+			height:32px;
+			max-width:64px;
+		}
+		
+		input {
+			margin-left:8px;
+		}
+		
+		#controlsContent {
+			text-align:center;
+			position:relative;
+			min-width:900px;
+			margin:0 auto;
+			z-index:210;
+		}
+		
+		#saveWindow {
+			position:absolute;
+				top:-164px;
+				right:8px;
+				z-index:190;
+			padding-top:20px;
+			width: 347px;
+			background:#222;
+		}
+		
+		#saveWindow:before {
+			content:'Right-Click the Image then Save As...';
+			float:right;
+			margin:-22px 4px 0 0;
+			font-weight:bold;
+			font-size:16px;
+		}
+		
+		#saveImage {
+			height:128px;
+			float:right;
+		}
+		
+		#saveControls {
+			float:right;
+			margin-right:8px;
+		}
+		
+		#saveControls * {
+			float:right;
+		}
+		
+		#imageControls {
+			float:left;
+			margin-left:8px;
+		}
+		
+	
+	
+	</style>
+</head>
+<body>
+	<div id="top"></div>
+	<div id="main">
+		<img id="template" src="./images/fbtemplate.png"/>
+		<canvas id="theCanvas" width="851" height="358"></canvas>
+		<canvas id="smallAvatarCanvas" width="25" height="25"></canvas>
+	</div>
+	<div id="controls"><div id="controlsContent">
+		<div id="imageControls">
+			<img id="currentImage" src="./images/default.jpg"></img>
+			<input id="changeImage" placeholder="Choose a file..." type="file"></input>
+			<input type="button" value="Center" onclick="centerImage()"></input>
+			<input type="button" value="Flip" onclick="flipImage()"></input>
+			<input id="sizeEntry" type="range" placeholder="Size (%) e.g. 100" min="10" max="500" step="10"></input>
+			<input type="color" placeholder="#000000" onchange="changeBackgroundColor(this.value)"></input>
+		</div>
+		<div id="saveControls">
+			<input value="Save Avatar" type="button" onclick="onSave(this.name)" name="avatar"></input>
+			<input value="Save Cover" type="button" onclick="onSave(this.name)" name="cover"></input>
+		</div>
+	</div></div>
+
+	<script>
+			var mouseImageX = mouseImageY = 0;
+			
+			var loadedImage = new Image();
+				loadedImage.src = document.getElementById('currentImage').src;
+			var imageW = 0;
+			var imageH = 0;
+			var imageX = imageY = 0;
+			
+			var color = '#000000';
+			var canvas;
+			var smallAvatarCanvas;
+			var saveCanvas = document.createElement('canvas'); //Used to export images
+			
+			loadedImage.addEventListener('load', setup);
+			
+			function setup() {
+				canvas = document.getElementById('theCanvas');
+				canvas.addEventListener('mousedown', onMouseDown);
+				canvas.addEventListener('mouseup', onMouseUp);
+				canvas.addEventListener('mouseout', onMouseUp);
+				
+				document.getElementById('sizeEntry').addEventListener('change', changeSize);
+				document.getElementById('changeImage').addEventListener('change', changeImage);
+				
+				smallAvatarCanvas = document.getElementById('smallAvatarCanvas');
+				
+				imageW =  loadedImage.width;
+				imageH =  loadedImage.height;
+				centerImage();
+				
+				setInterval(draw, 1000/60);
+				
+				loadedImage.removeEventListener('load', setup);
+			}
+			
+			function onMouseUp() {
+				canvas.removeEventListener('mousemove', onMouseMove);
+			}
+			
+			function onMouseDown(event) {
+				mouseImageX = event.clientX - imageX;
+				mouseImageY = event.clientY - imageY;
+				
+				canvas.addEventListener('mousemove', onMouseMove);
+			}
+			
+			function onMouseMove(event) {
+				imageX = event.clientX - mouseImageX;
+				imageY = event.clientY - mouseImageY;
+			}
+			
+			function changeSize() {
+				var f = document.getElementById('sizeEntry').value / 100;
+				
+				oldW = imageW;
+				oldH = imageH;
+				
+				imageW = loadedImage.width * f;
+				imageH = loadedImage.height * f;
+				
+				imageX = imageX + (oldW/2) - (imageW/2);
+				imageY = imageY + (oldH/2) - (imageH/2);
+			}
+			
+			function onSave(value) {
+				switch(value) {
+					case 'avatar' :
+						saveCanvas.setAttribute('width', '180');
+						saveCanvas.setAttribute('height', '180');
+						var ctx = saveCanvas.getContext('2d');
+						ctx.drawImage(canvas, 28, 199, 160, 160, 0, 0, 180, 180);
+						break;
+					case 'cover' :
+						saveCanvas.setAttribute('width', '851');
+						saveCanvas.setAttribute('height', '315');
+						var ctx = saveCanvas.getContext('2d');
+						ctx.drawImage(canvas, 0, 0, 851, 315, 0, 0, 851, 315);
+						break;
+					default :
+						return;
+				}
+				var url = saveCanvas.toDataURL('image/png');
+				
+				var newImage = document.getElementById('saveImage');
+				if(!newImage) { //Show Save Window
+					newImage = document.createElement('img');
+					newImage.setAttribute('id','saveImage');
+					var saveWindow = document.createElement('div');
+					saveWindow.setAttribute('id','saveWindow');
+					saveWindow.appendChild(newImage);
+					
+					var controls = document.getElementById('saveControls');
+					controls.appendChild(saveWindow);
+					
+					var closeButton = document.createElement('input');
+					closeButton.setAttribute('type','button');
+					closeButton.setAttribute('value','v');
+					closeButton.setAttribute('id','hideSaveButton');
+					closeButton.setAttribute('title','hide save window');
+					closeButton.addEventListener('click', hideSave);
+					
+					controls.appendChild(closeButton);
+				}
+				
+				newImage.src = url;
+			}
+			
+			function hideSave() {
+				var closeButton = document.getElementById('hideSaveButton');
+				var controls = closeButton.parentNode;
+				controls.removeChild(closeButton);
+				controls.removeChild(document.getElementById('saveWindow'));
+			}
+			
+			function changeImage() {
+				var file = document.getElementById("changeImage").files[0];
+				var url = window.URL || window.webkitURL;
+				var src = url.createObjectURL(file);
+				
+				loadedImage.src = src;
+				imageW = loadedImage.width;
+				imageH = loadedImage.height;
+				
+				
+				document.getElementById('currentImage').src = src;
+				
+				centerImage();
+				
+				var sizeEntry = document.getElementById('sizeEntry');
+				sizeEntry.value = null;
+				
+				url.revokeObjectURL(src);
+			}
+			
+			function flipImage() {
+				var nCanvas = document.createElement('canvas');
+				nCanvas.setAttribute('width', loadedImage.width);
+				nCanvas.setAttribute('height', loadedImage.height);
+				var ctx = nCanvas.getContext('2d');
+				
+				ctx.transform(-1, 0, 0, 1, loadedImage.width, 0);
+				ctx.drawImage(loadedImage, 0, 0);
+				
+				loadedImage.src = nCanvas.toDataURL('image/png');
+				document.getElementById('currentImage').src = loadedImage.src;
+				console.log('LoadedImage :: ' + loadedImage.width + ' ' + loadedImage.height);
+			}
+			
+			function changeBackgroundColor(inputElement) {
+				if(inputElement.value == '') {
+					inputElement.value = color;
+				} else {
+					color = value;
+				}
+			}
+			
+			function centerImage() {
+				imageX = (canvas.width/2 - imageW/2);
+				imageY = (canvas.height/2 - imageH/2);
+			}
+			
+			function draw() {
+				var context = canvas.getContext('2d');
+				context.fillStyle = color;
+				context.fillRect(0, 0, canvas.width, canvas.height);
+				context.drawImage(loadedImage, imageX, imageY,  imageW, imageH);
+				
+				context = smallAvatarCanvas.getContext('2d');
+				context.drawImage(canvas, 28, 199, 160, 160, 0, 0, 25, 25);
+			}
+	</script>
+</body>
+
+
+
+</html>
